@@ -9,30 +9,13 @@ use py32_hal::gpio::{Flex, Speed};
 
 use {defmt_rtt as _, panic_halt as _};
 
-fn set_flex_random(led_pins: &mut [Flex], rand: &mut i32) {
-    const M:i32 = 65537;
-    const A:i32 = 75;
-    const C:i32 = 74;
-    for i in led_pins.iter_mut() {
-        *rand = (*rand * A + C) % M;
-        match *rand % 3 {
-            0 => {
-                i.set_as_output(Speed::Low);
-                i.set_low();
-            }
-            1 => {
-                i.set_as_output(Speed::Low);
-                i.set_high();
-            }
-            _ => i.set_as_input(py32_hal::gpio::Pull::None),
-        }
-    }
-}
+mod charlie;
+
 
 async fn charlieplex_test() {
     let p = py32_hal::init(Default::default());
 
-    let mut led_pins = [
+    let mut led_pins: [Flex<'_>; 7] = [
         Flex::new(p.PA0),
         Flex::new(p.PA1),
         Flex::new(p.PA2),
@@ -49,21 +32,19 @@ async fn charlieplex_test() {
         Flex::new(p.PA13)
     ];
 
-    let mut rand = 0;
-    const M:i32 = 65537;
-    const A:i32 = 75;
-    const C:i32 = 74;
-    
-    loop {
-        set_flex_random(&mut led_pins, &mut rand);
-        set_flex_random(&mut led_white, &mut rand);
-        Timer::after_millis(1000).await;
-    }
+    let mut test_charlie = charlie::Charlie::new(&led_pins);
+
+    // loop {
+    test_charlie.draw();
+    Timer::after_millis(1000).await;
+    drop(test_charlie);
 }
 
 // main is itself an async function.
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     info!("Hello World!");
+
+
     charlieplex_test().await;
 }
